@@ -1,0 +1,11 @@
+# 测试与工具产物
+.screenshots/
+.trae-html-share-packages/
+.trae/
+
+# 第三方审查报告（非应用运行文件）
+cet4-review-2026/
+
+# 系统文件
+Thumbs.db
+.DS_Store

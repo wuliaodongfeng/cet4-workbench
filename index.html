@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f4f6fb" />
+  <title>四级学习工作台</title>
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="四级工作台" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark">CET-4</span>
+        <span class="brand-name">四级学习工作台</span>
+      </div>
+      <span class="storage-badge" id="storage-badge" data-mode="memory">存储</span>
+    </header>
+
+    <main class="pages">
+      <!-- 背词页 -->
+      <section class="page is-active" id="page-words" data-page="words">
+        <div class="words-head">
+          <div class="words-headline">
+            <span class="words-label">今日待复习</span>
+            <span class="words-count"><strong id="words-due-count">0</strong> 张</span>
+          </div>
+          <div class="progress"><div class="progress-fill" id="words-progress-fill"></div></div>
+          <div class="progress-text" id="words-progress-text">0 / 0</div>
+          <p class="task-banner" id="words-banner"></p>
+          <div class="chip-row" id="words-range">
+            <button class="chip is-active" type="button" data-action="range" data-range="all">全部</button>
+            <button class="chip" type="button" data-action="range" data-range="cet4">CET4</button>
+            <button class="chip" type="button" data-action="range" data-range="high">高频</button>
+            <button class="chip" type="button" data-action="range" data-range="wrong">错词</button>
+          </div>
+          <div class="chip-row" id="words-mode">
+            <span class="chip-label">模式</span>
+            <button class="chip is-active" type="button" data-action="mode" data-mode="recognize">认词</button>
+            <button class="chip" type="button" data-action="mode" data-mode="spell">拼写</button>
+          </div>
+          <div id="words-resume"></div>
+        </div>
+        <div class="words-stage" id="words-stage" data-phase="loading">
+          <div class="stage-loading">正在初始化词库，首次打开约需几秒…</div>
+        </div>
+        <div class="words-actions" id="words-actions"></div>
+      </section>
+
+      <!-- 刷题页 -->
+      <section class="page" id="page-quiz" data-page="quiz">
+        <div class="quiz-view" id="quiz-view"></div>
+      </section>
+
+      <!-- 我的页 -->
+      <section class="page" id="page-me" data-page="me">
+        <div class="me-view" id="me-view"></div>
+      </section>
+    </main>
+
+    <nav class="tabbar">
+      <button class="tab is-active" type="button" data-tab="words"><span class="tab-name">背词</span></button>
+      <button class="tab" type="button" data-tab="quiz"><span class="tab-name">刷题</span></button>
+      <button class="tab" type="button" data-tab="me"><span class="tab-name">我的</span></button>
+    </nav>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="data/seed.js"></script>
+  <script src="data/content-words.js"></script>
+  <script src="data/content-questions.js"></script>
+  <script src="data/content-writing.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/fsrs.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/speech.js"></script>
+  <script src="js/words-source.js"></script>
+  <script src="js/words-view.js"></script>
+  <script src="js/words.js"></script>
+  <script src="js/quiz-core.js"></script>
+  <script src="js/quiz-exam.js"></script>
+  <script src="js/wrongbook.js"></script>
+  <script src="js/quiz-view.js"></script>
+  <script src="js/quiz.js"></script>
+  <script src="js/me-backup.js"></script>
+  <script src="js/me-stats.js"></script>
+  <script src="js/me.js"></script>
+  <script src="js/pwa.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
+<!-- DONE: index.html -->
