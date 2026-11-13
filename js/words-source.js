@@ -93,44 +93,58 @@ window.WordsSource = (function () {
     return picked.slice(0, quota);
   }
 
-  /** 到期卡拆成「复习」与「新词」：复习按逾期倒序取 100 张，新词按层给当天额度 */
-  function limitCards(cards) {
-    const reviews = [];
+  /** 每个词最近一次作答记录，用于识别「上次评了 Again」的错词 */
+  function latestWordAttempts(attempts) {
+    const latest = {};
+    attempts.forEach(function (item) {
+      if (item.kind !== 'word') return;
+      const prev = latest[item.refId];
+      if (!prev || Number(item.timestamp) >= Number(prev.timestamp)) latest[item.refId] = item;
+    });
+    return latest;
+  }
+
+  /** 到期卡拆成「错词 / 复习 / 新词」三队：错词优先，复习按逾期倒序，新词按层给额度 */
+  function limitCards(cards, latest) {
+    const wrong = [];
+    const normal = [];
     const fresh = [];
     cards.forEach(function (word) {
       const reps = word.fsrs ? Number(word.fsrs.reps) || 0 : 0;
-      if (reps > 0) reviews.push(word);
-      else fresh.push(word);
+      if (reps === 0) {
+        fresh.push(word);
+        return;
+      }
+      const record = latest[word.id];
+      if (record && record.correct === false) wrong.push(word);
+      else normal.push(word);
     });
 
-    reviews.sort(function (a, b) {
+    function byDue(a, b) {
       return String(a.fsrs.due).localeCompare(String(b.fsrs.due));
-    });
-    const keptReviews = reviews.slice(0, REVIEW_CAP);
+    }
+    wrong.sort(byDue);
+    normal.sort(byDue);
+    const keptWrong = wrong.slice(0, REVIEW_CAP);
+    const keptNormal = normal.slice(0, Math.max(0, REVIEW_CAP - keptWrong.length));
     const quota = Math.max(0, DAILY_NEW - readNewDone());
     const picked = pickNewWords(fresh, quota);
 
     return {
-      cards: keptReviews.concat(picked),
-      overflow: Math.max(0, reviews.length - keptReviews.length)
+      cards: keptWrong.concat(keptNormal, picked),
+      overflow: Math.max(0, wrong.length + normal.length - keptWrong.length - keptNormal.length),
+      breakdown: { wrong: keptWrong.length, due: keptNormal.length, fresh: picked.length }
     };
   }
 
-  /** 按范围过滤词卡：全部 / CET4 / 高频 / 错词，返回 { cards, overflow } */
+  /** 按范围过滤词卡：全部 / CET4 / 高频 / 错词，返回 { cards, overflow, breakdown } */
   function filterCards(words, attempts, range) {
+    const latest = latestWordAttempts(attempts);
     if (range === 'wrong') {
-      const latest = {};
-      attempts.forEach(function (item) {
-        if (item.kind !== 'word') return;
-        const prev = latest[item.refId];
-        if (!prev || Number(item.timestamp) >= Number(prev.timestamp)) latest[item.refId] = item;
+      const cards = words.filter(function (word) {
+        return latest[word.id] && latest[word.id].correct === false && FSRS.isDue(word);
       });
-      return {
-        cards: words.filter(function (word) {
-          return latest[word.id] && latest[word.id].correct === false;
-        }),
-        overflow: 0
-      };
+      return { cards: cards, overflow: 0, breakdown: { wrong: cards.length, due: 0, fresh: 0 } };
     }
 
     const due = words.filter(function (word) {
@@ -139,14 +153,14 @@ window.WordsSource = (function () {
     if (range === 'high') {
       return limitCards(due.filter(function (word) {
         return Array.isArray(word.tags) && word.tags.indexOf('high') >= 0;
-      }));
+      }), latest);
     }
     if (range === 'cet4') {
       return limitCards(due.filter(function (word) {
         return !Array.isArray(word.tags) || word.tags.indexOf('cet4') >= 0;
-      }));
+      }), latest);
     }
-    return limitCards(due);
+    return limitCards(due, latest);
   }
 
   /** 读取未完成的背词快照 */
@@ -170,6 +184,7 @@ window.WordsSource = (function () {
     return {
       cards: session.cards,
       dueCount: session.cards.length,
+      breakdown: session.breakdown,
       overflow: session.overflow,
       resume: await readResume(),
       streak: Stats.streak(attempts),

@@ -47,14 +47,17 @@ window.QuizView = (function () {
     const exam = state.openMode === 'exam';
     const cards = state.papers.map(function (paper) {
       const percent = paper.total ? Math.round((paper.answered / paper.total) * 100) : 0;
+      const status = paper.answered === 0
+        ? '未开始'
+        : (paper.answered >= paper.total ? '已答完' : '进行中');
       const enter = exam
         ? '开始模考（40 分钟）'
-        : (paper.resumed ? '继续作答（第 ' + (paper.draftIndex + 1) + ' 题）' : '进入作答');
+        : (paper.resumed ? '继续作答（第 ' + (paper.draftIndex + 1) + ' 题）' : (status === '进行中' ? '继续作答' : '进入作答'));
       return `
         <button class="paper-card" type="button" data-action="open-paper" data-paper="${esc(paper.paperId)}">
           <div class="paper-head">
             <span class="paper-name">${esc(paperLabel(paper.paperId))}</span>
-            <span class="paper-meta">${paper.total} 题</span>
+            <span class="paper-meta">${esc(status)} · ${paper.total} 题</span>
           </div>
           <div class="paper-bar"><span style="width:${percent}%"></span></div>
           <div class="paper-foot">

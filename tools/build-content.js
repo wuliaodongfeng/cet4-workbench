@@ -11,10 +11,14 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const bankParser = require('./bank-parser');
+const parseClozeNote = bankParser.parseClozeNote;
+const deriveClozeBank = bankParser.deriveClozeBank;
+const splitByLabel = bankParser.splitByLabel;
 
 const TEMP = process.env.TEMP;
 const ROOT = path.resolve(__dirname, '..');
-const CONTENT_VERSION = 4;
+const CONTENT_VERSION = 5;
 
 /** 在隔离沙箱中执行 window 挂载型数据脚本，取回 window */
 function loadWindowScript(file) {
@@ -118,49 +122,6 @@ function buildWords() {
 }
 
 /**
- * 从 cloze section 的 note 中提取 A–O 词库与选词填空短文
- * note 是纯文本，格式为「词库：A. xxx ... 短文：第 26 空...」
- */
-function parseClozeNote(note) {
-  const text = String(note || '');
-  const bank = [];
-  const pattern = /^\s*([A-O])[.、]\s*(.+?)\s*$/gm;
-  let matched = pattern.exec(text);
-  let bankEnd = 0;
-  while (matched !== null) {
-    bank.push({ letter: matched[1], word: matched[2].trim() });
-    bankEnd = pattern.lastIndex;
-    matched = pattern.exec(text);
-  }
-  bank.sort(function (a, b) { return a.letter.localeCompare(b.letter); });
-  // 短文可能带「短文：」标记，也可能紧跟在词库之后，两种格式都兼容
-  const passage = text.slice(bankEnd)
-    .replace(/^\s*/, '')
-    .replace(/^短文\s*[:：]\s*/, '')
-    .trim();
-  return { wordbank: bank.map(function (item) { return item.word; }), passage: passage };
-}
-
-/**
- * 按「Paragraph A:」「Passage 1:」这类标记切分原文
- * 返回 [{ key, text }]，未匹配到任何标记时返回空数组
- */
-function splitByLabel(note, label) {
-  const text = String(note || '');
-  const pattern = new RegExp(label + '\\s+([A-Z0-9]+)\\s*[:：]', 'g');
-  const marks = [];
-  let matched = pattern.exec(text);
-  while (matched !== null) {
-    marks.push({ key: matched[1], start: matched.index, contentStart: pattern.lastIndex });
-    matched = pattern.exec(text);
-  }
-  return marks.map(function (mark, index) {
-    const end = index + 1 < marks.length ? marks[index + 1].start : text.length;
-    return { key: mark.key, text: text.slice(mark.contentStart, end).trim() };
-  }).filter(function (item) { return item.text.length > 0; });
-}
-
-/**
  * 构建题库：只取 cloze / matching / reading 三类客观题，跳过听力与主观题
  * 同时收集写作与翻译题面，供「我的」页静态资料使用
  */
@@ -238,6 +199,14 @@ function buildQuestions() {
           paperRecord.total += 1;
         });
       });
+
+      // 真题风格卷若未给候选词库，用答案词与短文实词合成，保证题目可作答
+      if (!paperRecord.wordbank.length && paperRecord.materials.cloze) {
+        const answers = questions.filter(function (item) {
+          return item.paperId === paperId && item.type === 'blank';
+        }).map(function (item) { return item.answer; });
+        paperRecord.wordbank = deriveClozeBank(paperRecord.materials.cloze, answers);
+      }
 
       papers.push(paperRecord);
     });

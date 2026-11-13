@@ -1179,6 +1179,25 @@ input {
   background: var(--brand-soft);
 }
 
+/* 已掌握标记与拼写判错模式 */
+.known-btn,
+.spell-mode-btn {
+  align-self: center;
+  margin-top: 10px;
+  padding: 6px 16px;
+  border: 1px solid #dfe4ee;
+  border-radius: 999px;
+  background: #f7f9fc;
+  color: #66728a;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.known-btn:active,
+.spell-mode-btn:active {
+  background: #eef2f8;
+}
+
 /* ---------- 刷题：模式 / 错题本 / 专项 / 计时 ---------- */
 .quiz-tags {
   display: inline-flex;

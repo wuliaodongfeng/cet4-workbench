@@ -57,6 +57,10 @@ window.WordsView = (function () {
     } else {
       const left = Math.max(0, state.cards.length - state.index);
       text = '今日还剩 ' + left + ' 张 · ' + streak;
+      if (state.breakdown) {
+        const parts = ['新词 ' + state.breakdown.fresh, '到期 ' + state.breakdown.due, '错词 ' + state.breakdown.wrong];
+        text += ' · ' + parts.join(' / ');
+      }
     }
     if (state.overflow > 0) {
       text += ' · 另有 ' + state.overflow + ' 张到期卡已顺延到明天';
@@ -126,19 +130,22 @@ window.WordsView = (function () {
   function recognizeBack(card) {
     return '<span class="card-label">释义</span>' +
       '<span class="card-meaning">' + esc(card.meaning || '') + '</span>' +
-      exampleBlock(card);
+      exampleBlock(card) +
+      '<button class="known-btn" type="button" data-action="mark-known">已掌握，不再出现</button>';
   }
 
   /**
    * 拼写模式：正面释义 + 首字母提示 + 输入框
    */
-  function spellFront(card) {
+  function spellFront(state, card) {
     const word = String(card.word || '');
+    const modeName = state.spellMode === 'strict' ? '严格' : '宽松';
     return '<span class="card-label">释义</span>' +
       '<span class="card-meaning">' + esc(card.meaning || '') + '</span>' +
       '<span class="spell-hint">首字母 ' + esc(word.charAt(0).toUpperCase()) + ' · 共 ' + word.length + ' 个字母</span>' +
       '<input class="spell-input" id="spell-input" type="text" data-spell="answer" autocomplete="off" ' +
-      'autocapitalize="off" spellcheck="false" placeholder="请输入完整单词" />';
+      'autocapitalize="off" spellcheck="false" placeholder="请输入完整单词" />' +
+      '<button class="spell-mode-btn" type="button" data-action="spell-mode">判错：' + modeName + '</button>';
   }
 
   /**
@@ -157,7 +164,8 @@ window.WordsView = (function () {
       your +
       '<span class="card-label">释义</span>' +
       '<span class="card-meaning">' + esc(card.meaning || '') + '</span>' +
-      exampleBlock(card);
+      exampleBlock(card) +
+      '<button class="known-btn" type="button" data-action="mark-known">已掌握，不再出现</button>';
   }
 
   /**
@@ -170,7 +178,7 @@ window.WordsView = (function () {
       const card = state.cards[state.index];
       if (card) {
         if (state.viewMode === 'spell') {
-          el.front.innerHTML = spellFront(card);
+          el.front.innerHTML = spellFront(state, card);
           el.back.innerHTML = spellBack(state, card);
         } else {
           el.front.innerHTML = recognizeFront(card);

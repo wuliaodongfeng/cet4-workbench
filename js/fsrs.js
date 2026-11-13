@@ -110,7 +110,10 @@ window.FSRS = (function () {
    * 到期判断：due <= today
    */
   function isDue(word) {
-    if (!word || !word.fsrs || !word.fsrs.due) return true;
+    if (!word || !word.fsrs) return true;
+    // 已掌握的词不再进入任何复习队列
+    if (word.fsrs.state === 'known') return false;
+    if (!word.fsrs.due) return true;
     return String(word.fsrs.due) <= todayStr();
   }
 

@@ -17,14 +17,16 @@ window.Words = (function () {
     resume: null,
     overflow: 0,
     streak: 0,
-    doneToday: 0
+    doneToday: 0,
+    breakdown: null,
+    spellMode: 'loose'
   };
 
   const el = {};
 
   /** 拼写归一化：转小写、只保留字母 */
   function normalizeSpelling(text) {
-    return String(text).toLowerCase().replace(/[^a-z]/g, '');
+    return Spell.normalize(text);
   }
 
   /** 初始化：缓存容器、绑定事件、加载词卡 */
@@ -61,6 +63,9 @@ window.Words = (function () {
     else if (action === 'spell-next') rate(state.spellResult && state.spellResult.correct ? 3 : 1);
     else if (action === 'speak-word') speakCurrent('word');
     else if (action === 'speak-example') speakCurrent('example');
+    else if (action === 'mark-known') markKnown();
+    else if (action === 'spell-mode') toggleSpellMode();
+    else if (action === 'open-wrong') changeRange('wrong');
   }
 
   /** 朗读当前卡片的单词或例句；浏览器不支持时给出提示 */
@@ -100,6 +105,7 @@ window.Words = (function () {
       state.overflow = session.overflow || 0;
       state.streak = session.streak || 0;
       state.doneToday = session.doneToday || 0;
+      state.breakdown = session.breakdown || null;
       render();
     } catch (err) {
       state.phase = 'done';
@@ -178,11 +184,46 @@ window.Words = (function () {
       return;
     }
     state.spellResult = {
-      correct: normalizeSpelling(input.value) === normalizeSpelling(card.word),
+      correct: Spell.judge(input.value, card.word),
       value: input.value.trim()
     };
     state.flipped = true;
     render();
+  }
+
+  /** 切换拼写判错模式：宽松 ↔ 严格 */
+  function toggleSpellMode() {
+    const next = Spell.toggle();
+    state.spellMode = next;
+    window.toast(next === 'strict' ? '拼写判错：严格（必须完全一致）' : '拼写判错：宽松（允许个别字母错）');
+    render();
+  }
+
+  /** 标记已掌握：不再进入复习队列 */
+  async function markKnown() {
+    const card = state.cards[state.index];
+    if (!card) return;
+    try {
+      const now = Date.now();
+      const updated = Object.assign({}, card, {
+        fsrs: Object.assign({}, card.fsrs, {
+          state: 'known',
+          reps: Number(card.fsrs && card.fsrs.reps) || 0,
+          lastReview: FSRS.todayStr(),
+          updatedAt: now
+        })
+      });
+      await DB.putWord(updated);
+      window.toast('已标记掌握，本词不再出现');
+      state.index += 1;
+      state.flipped = false;
+      state.spellResult = null;
+      if (state.index >= state.cards.length) state.phase = 'done';
+      WordsSource.saveDraft(state);
+      render();
+    } catch (err) {
+      window.toast('标记掌握失败：' + err.message);
+    }
   }
 
   /** 评分：更新 FSRS、写回词卡、记录复习日志，然后进入下一张 */
@@ -248,6 +289,7 @@ window.Words = (function () {
 
   /** 统一渲染入口（委托给渲染层） */
   function render() {
+    state.spellMode = Spell.mode();
     WordsView.render(state, el);
   }
 
