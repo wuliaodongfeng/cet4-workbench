@@ -17,6 +17,7 @@ window.MeBackup = (function () {
           await navigator.share({ files: [file], title: '四级学习工作台备份' });
           recordExport();
           window.toast('已打开系统分享面板');
+          await refreshPanel();
           return;
         } catch (err) {
           if (err && err.name === 'AbortError') return;
@@ -29,6 +30,7 @@ window.MeBackup = (function () {
       downloadText(text, fileName);
       recordExport();
       window.toast('已导出备份文件');
+      await refreshPanel();
     } catch (err) {
       window.toast('导出失败：' + err.message);
     }
@@ -82,6 +84,7 @@ window.MeBackup = (function () {
         navigator.clipboard.writeText(text).then(function () {
           recordExport();
           window.toast('已复制备份内容');
+          refreshPanel();
         });
       }
     });
@@ -93,6 +96,13 @@ window.MeBackup = (function () {
    */
   function recordExport() {
     if (window.DataGuard) DataGuard.markExported();
+  }
+
+  /**
+   * 导出成功后重绘「我的」页，让「上次导出」与提醒文案立即更新
+   */
+  async function refreshPanel() {
+    if (window.Me && Me.load) await Me.load();
   }
 
   /**
@@ -145,11 +155,17 @@ window.MeBackup = (function () {
    */
   async function restore() {
     if (!window.DataGuard) return;
-    if (!window.confirm('将用最近一次自动快照覆盖当前数据，确定继续吗？')) return;
     try {
-      const record = await DataGuard.restoreLatest();
+      const record = await DataGuard.latest();
+      if (!record) {
+        window.toast('没有可用的自动快照');
+        return;
+      }
+      const when = formatDate(new Date(record.createdAt));
+      if (!window.confirm('最近一次自动快照：' + when + '。\n恢复会用这份快照覆盖当前数据，之后的进度将丢失。确定继续吗？')) return;
+      const restored = await DataGuard.restoreLatest();
       if (window.AppRefresh) await window.AppRefresh();
-      window.toast('已恢复到 ' + formatDate(new Date(record.createdAt)) + ' 的快照');
+      window.toast('已恢复到 ' + formatDate(new Date(restored.createdAt)) + ' 的快照');
     } catch (err) {
       window.toast('恢复失败：' + err.message);
     }

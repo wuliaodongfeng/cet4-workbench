@@ -225,6 +225,10 @@ window.DataGuard = (function () {
   async function init() {
     requestPersist();
     await snapshot('每日快照', false);
+    // 从后台回到前台时补一次提醒，避免页面长期挂起后从不提示
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) remindOnce();
+    });
   }
 
   return {

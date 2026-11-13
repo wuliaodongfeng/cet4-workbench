@@ -2,7 +2,7 @@
  * sw.js —— Service Worker
  * 预缓存全部应用外壳；离线时导航请求回退到缓存的 index.html
  */
-const CACHE_NAME = 'cet4-v7';
+const CACHE_NAME = 'cet4-v8';
 
 // 必须列全：空预缓存会导致 iOS 清理缓存后离线白屏
 const PRECACHE_URLS = [
