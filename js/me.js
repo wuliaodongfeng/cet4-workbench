@@ -9,7 +9,7 @@ window.Me = (function () {
     memory: { label: '内存', desc: '浏览器存储均不可用，数据只保留在当前页面，关闭后会丢失，请及时导出备份。' }
   };
 
-  const state = { words: [], questions: [], attempts: [], persisted: false };
+  const state = { words: [], questions: [], attempts: [], persisted: false, guard: null };
   const el = {};
 
   /**
@@ -34,6 +34,7 @@ window.Me = (function () {
       state.questions = questions;
       state.attempts = attempts;
       if (window.PWA) state.persisted = await PWA.isPersisted();
+      if (window.DataGuard) state.guard = await DataGuard.status();
       render();
     } catch (err) {
       window.toast('读取统计数据失败：' + err.message);
@@ -131,23 +132,6 @@ window.Me = (function () {
   }
 
   /**
-   * 渲染备份面板（导出 / 导入）
-   */
-  function renderBackup() {
-    return [
-      '<div class="panel">',
-      '  <div class="panel-head"><h3>数据备份</h3></div>',
-      '  <p class="panel-text">导出的 JSON 包含词库、题库和全部答题记录，可换设备恢复。</p>',
-      '  <div class="panel-actions">',
-      '    <button class="btn-primary" type="button" data-action="export">导出全部数据</button>',
-      '    <button class="btn-ghost" type="button" data-action="import">从 JSON 文件导入</button>',
-      '  </div>',
-      '  <input id="import-file" type="file" accept=".json,application/json" hidden />',
-      '</div>'
-    ].join('');
-  }
-
-  /**
    * 统一渲染入口
    */
   function render() {
@@ -165,7 +149,7 @@ window.Me = (function () {
       MeStats.renderStudyKit(),
       renderDiag(stats),
       renderSource(),
-      renderBackup(),
+      MeBackup.renderPanel(state.guard),
       window.PWA ? PWA.installPanelHtml() : ''
     ].join('');
   }
@@ -185,6 +169,8 @@ window.Me = (function () {
     }
     if (!window.confirm('导入会覆盖当前全部数据（含未完成的背词与答题进度），确定继续吗？')) return;
     try {
+      // 覆盖前留一份强制快照，导入错了还能从快照恢复
+      if (window.DataGuard) await DataGuard.snapshot('导入前', true);
       const result = await DB.importAll(data);
       await load();
       if (window.AppRefresh) await window.AppRefresh();
@@ -211,6 +197,10 @@ window.Me = (function () {
     }
     if (target.dataset.action === 'persist') {
       requestPersist();
+      return;
+    }
+    if (target.dataset.action === 'restore-snapshot') {
+      MeBackup.restore();
       return;
     }
     if (target.dataset.action === 'retention') {

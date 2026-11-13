@@ -163,10 +163,13 @@
       // 先注册 Service Worker，让离线缓存与首次写库并行
       if (window.PWA) PWA.start();
       await seedContent();
+      // 内容就绪后再生成快照，避免把空库写进备份
+      if (window.DataGuard) DataGuard.init();
       bindTabs();
       await Words.init();
       await Quiz.init();
       await Me.init();
+      if (window.DataGuard) DataGuard.remindOnce();
     } catch (err) {
       window.toast('工作台启动失败：' + err.message);
     }
