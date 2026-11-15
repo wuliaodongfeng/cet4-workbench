@@ -158,6 +158,19 @@ window.QuizView = (function () {
   }
 
   /**
+   * 已填词对应的字母编号（A–O），用于 blank-slot 展示，方便对照官方答案
+   */
+  function letterOfWord(paperId, word) {
+    const paper = findPaper(paperId);
+    const bank = paper && Array.isArray(paper.wordbank) ? paper.wordbank : [];
+    const target = String(word || '').trim().toLowerCase();
+    for (let i = 0; i < bank.length; i += 1) {
+      if (String(bank[i]).toLowerCase() === target) return String.fromCharCode(65 + i);
+    }
+    return '';
+  }
+
+  /**
    * 阅读材料：matching 展示 A–F 段原文，reading 按题干 (Passage N) 取对应原文
    * 英文原文接入点词翻译：点击单词弹出释义（word-tip.js）
    */
@@ -208,9 +221,10 @@ window.QuizView = (function () {
         Array.isArray(paper.wordbank) && paper.wordbank.length > 0;
       if (hasBank) {
         const filled = String(value).trim();
+        const letter = filled ? letterOfWord(question.paperId, filled) : '';
         return '<button class="blank-slot' + (filled ? ' is-filled' : '') + '" type="button" ' +
           'data-action="unpick-word" data-word="' + esc(filled) + '">' +
-          (filled ? esc(filled) + '<span class="blank-slot-hint">点此退选</span>'
+          (filled ? (letter ? '<b class="blank-slot-letter">' + letter + '</b>' : '') + esc(filled) + '<span class="blank-slot-hint">点此退选</span>'
             : '<span class="blank-slot-empty">点击下方候选词填入</span>') +
           '</button>';
       }

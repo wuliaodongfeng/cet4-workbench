@@ -137,10 +137,12 @@ window.MeStats = (function () {
           const lower = token.text.toLowerCase().replace(/['’]s$/, '');
           const entry = window.WordTip && window.WordTip.lookup ? window.WordTip.lookup(token.text) : null;
           const isProper = /^[A-Z]/.test(token.text);
-          if (entry) {
-            out += '<span class="wt-word" data-w="' + esc(entry.word) + '">' + esc(token.text) + '</span>';
-          } else if (LINK_SINGLE[lower]) {
+          // 连接词优先于词典命中：however/therefore/yet 等都在词库内，
+          // 若先判 entry 会被 wt-word 包走导致标蓝失效
+          if (LINK_SINGLE[lower]) {
             out += '<span class="ref-link">' + esc(token.text) + '</span>';
+          } else if (entry) {
+            out += '<span class="wt-word" data-w="' + esc(entry.word) + '">' + esc(token.text) + '</span>';
           } else if (!isProper && token.text.replace(/[^A-Za-z]/g, '').length >= 4) {
             out += '<span class="wt-hard">' + esc(token.text) + '</span>';
           } else {

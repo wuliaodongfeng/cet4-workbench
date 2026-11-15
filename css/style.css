@@ -1171,6 +1171,19 @@ input {
   color: var(--brand-deep);
 }
 
+.blank-slot-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  margin-right: 2px;
+  border-radius: 7px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 12px;
+}
+
 .blank-slot-hint {
   color: var(--ink-mute);
   font-size: 11px;
