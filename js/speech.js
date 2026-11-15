@@ -14,18 +14,37 @@ window.Speech = (function () {
   }
 
   /**
-   * 挑选英文音色：优先 en-US，其次 en-GB，避免用中文音色读英文
+   * 挑选英文音色：按自然度优先级匹配本地音源
+   * 优先级：Google/Samsung 高质量英文语音 → Microsoft 自然语音 → 常见命名音色 → 任意 en 音色
+   * 避免落到中文音色读英文（机器感强、发音失真）
    */
   function pickVoice() {
     if (!supported()) return null;
     const voices = window.speechSynthesis.getVoices() || [];
     if (!voices.length) return null;
-    const find = function (lang) {
-      return voices.filter(function (item) {
-        return String(item.lang || '').toLowerCase().indexOf(lang) === 0;
-      })[0];
+    const isEnglish = function (item) {
+      const lang = String(item.lang || '').toLowerCase();
+      return lang.indexOf('en') === 0;
     };
-    return find('en-us') || find('en-gb') || find('en') || null;
+    const PREFERRED = [
+      'google us english', 'google uk english female', 'google uk english male',
+      'samantha', 'karen', 'moira', 'tessa', 'fiona', 'allison', 'ava', 'susan', 'zira', 'aria',
+      'microsoft aria', 'microsoft jenny', 'microsoft guy', 'microsoft michelle',
+      'samsung tts', 'siri'
+    ];
+    const english = voices.filter(isEnglish);
+    if (!english.length) return null;
+    for (let i = 0; i < PREFERRED.length; i += 1) {
+      const target = PREFERRED[i];
+      const hit = english.filter(function (item) {
+        const name = String(item.name || '').toLowerCase();
+        return name.indexOf(target) >= 0;
+      })[0];
+      if (hit) return hit;
+    }
+    // 兜底：优先 local 音源（离线可用、延迟低），其次任意 en
+    const local = english.filter(function (item) { return item.localService; })[0];
+    return local || english[0];
   }
 
   /**
@@ -40,7 +59,7 @@ window.Speech = (function () {
       voice = voice || pickVoice();
       if (voice) utterance.voice = voice;
       utterance.lang = voice ? voice.lang : 'en-US';
-      utterance.rate = rate || 0.92;
+      utterance.rate = rate || 0.85;
       utterance.pitch = 1;
       window.speechSynthesis.speak(utterance);
       return true;
@@ -53,14 +72,14 @@ window.Speech = (function () {
    * 朗读单词，语速略慢便于跟读
    */
   function speakWord(word) {
-    return speak(word, 0.82);
+    return speak(word, 0.8);
   }
 
   /**
    * 朗读例句，正常语速
    */
   function speakExample(text) {
-    return speak(text, 0.95);
+    return speak(text, 0.88);
   }
 
   /**

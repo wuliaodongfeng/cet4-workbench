@@ -58,6 +58,103 @@ window.MeStats = (function () {
   }
 
   /**
+   * 范文重点标注（单趟分词器）：
+   * 1) 段首句（主题句）加浅黄底高亮；
+   * 2) 逻辑连接词短语标蓝（优先整短语匹配，避免被点词包裹破坏）；
+   * 3) 其余单词走点词翻译（wt-word），未收录词加生词下划线（wt-hard）。
+   * 全程先取原文再转义，受控 span 包裹，不会破坏页面结构。
+   */
+  function renderReference(stem, reference) {
+    const text = String(reference || '');
+    if (!text.trim()) return '';
+    const LINK_SET = [
+      'first and foremost', 'first of all', 'to begin with', 'for one thing',
+      'what is more', 'in addition', 'for example', 'for instance', 'a case in point',
+      'in particular', 'by contrast', 'on the contrary', 'on the one hand', 'on the other hand',
+      'as a result', 'in conclusion', 'to conclude', 'in summary', 'to sum up', 'in other words'
+    ].reduce(function (set, phrase) { set[phrase] = true; return set; }, {});
+    const LINK_SINGLE = {
+      'moreover': 1, 'furthermore': 1, 'besides': 1, 'however': 1, 'nevertheless': 1,
+      'nonetheless': 1, 'therefore': 1, 'thus': 1, 'consequently': 1, 'hence': 1,
+      'admittedly': 1, 'indeed': 1, 'overall': 1, 'also': 1, 'specifically': 1, 'yet': 1, 'first': 1
+    };
+
+    const paragraphs = text.split(/\n+/).filter(function (part) {
+      return part.trim();
+    });
+
+    const htmlParts = paragraphs.map(function (paragraph) {
+      // 段内切句：非句末标点收进同一句
+      const sentences = paragraph.match(/[^.!?]+[.!?]+["'’”)]*|[^.!?]+$/g) || [paragraph];
+      return sentences.map(function (sentence, sentenceIndex) {
+        const tokens = [];
+        const re = /[A-Za-z][A-Za-z'’-]*|\s+|[^\sA-Za-z]+/g;
+        let m;
+        while ((m = re.exec(sentence)) !== null) {
+          tokens.push({ text: m[0], isWord: /^[A-Za-z]/.test(m[0]) });
+        }
+        // 逐 token 组装：先尝试连接词短语（2–5 词），再走点词翻译
+        let out = '';
+        let i = 0;
+        while (i < tokens.length) {
+          const token = tokens[i];
+          if (!token.isWord) {
+            out += esc(token.text);
+            i += 1;
+            continue;
+          }
+          // 连接词短语组匹配：窗口 i..i+span-1 内，首尾是词，中间 token 全为空白
+          let matchedLen = 0;
+          for (let span = 5; span >= 2; span -= 1) {
+            const windowTokens = tokens.slice(i, i + span);
+            if (windowTokens.length < span) break;
+            const wordCount = windowTokens.filter(function (part) { return part.isWord; }).length;
+            const gapCount = span - wordCount;
+            // 窗口应正好是 span 个词由 (span-1) 个纯空白 token 连接；
+            // 由于分词器把连续空白合并成一个 token，gapCount 应为 span-1
+            const first = windowTokens[0];
+            const last = windowTokens[span - 1];
+            const mids = windowTokens.slice(1, span - 1);
+            const midsOk = mids.length === span - 2 &&
+              mids.every(function (part) { return !part.isWord && /^\s+$/.test(part.text); });
+            if (first.isWord && last.isWord && midsOk) {
+              // 词序列（跳过空白）
+              const words = windowTokens.filter(function (part) { return part.isWord; })
+                .map(function (part) { return part.text.toLowerCase(); });
+              const joined = words.join(' ');
+              if (LINK_SET[joined]) {
+                matchedLen = span;
+                break;
+              }
+            }
+          }
+          if (matchedLen) {
+            const group = tokens.slice(i, i + matchedLen);
+            out += '<span class="ref-link">' + esc(group.map(function (part) { return part.text; }).join('')) + '</span>';
+            i += matchedLen;
+            continue;
+          }
+          const lower = token.text.toLowerCase().replace(/['’]s$/, '');
+          const entry = window.WordTip && window.WordTip.lookup ? window.WordTip.lookup(token.text) : null;
+          const isProper = /^[A-Z]/.test(token.text);
+          if (entry) {
+            out += '<span class="wt-word" data-w="' + esc(entry.word) + '">' + esc(token.text) + '</span>';
+          } else if (LINK_SINGLE[lower]) {
+            out += '<span class="ref-link">' + esc(token.text) + '</span>';
+          } else if (!isProper && token.text.replace(/[^A-Za-z]/g, '').length >= 4) {
+            out += '<span class="wt-hard">' + esc(token.text) + '</span>';
+          } else {
+            out += esc(token.text);
+          }
+          i += 1;
+        }
+        return sentenceIndex === 0 ? '<span class="ref-topic">' + out + '</span>' : out;
+      }).join('');
+    }).join('<span class="ref-br"></span>');
+    return htmlParts;
+  }
+
+  /**
    * 写作三段式模板，考前可直接套用
    */
   function writingTemplate() {
@@ -126,18 +223,28 @@ window.MeStats = (function () {
     const translation = (window.CONTENT && window.CONTENT.translation) || [];
     if (!writing.length && !translation.length) return '';
 
+    // 题干：写作/翻译的原文都在 prompt 字段（promptZh 只是“请翻译成英文”类指令文案），
+    // 优先取 prompt，避免只显示指令而看不到题干（用户反馈：翻译题看不到题干，仅有英文）
     const writingItems = writing.map(function (item) {
+      const stem = String(item.prompt || item.promptZh || '');
+      const refWords = String(item.reference || '').split(/\s+/).filter(Boolean).length;
+      const highlighted = renderReference(stem, item.reference || '');
+      const zhHint = item.promptZh && item.promptZh !== item.prompt
+        ? '<details class="kit-zh"><summary>显示中文提示</summary>' +
+          '<p class="kit-text">' + esc(item.promptZh) + '</p></details>'
+        : '';
       return '<details class="kit-item"><summary>' + esc(item.title) + ' · 写作</summary>' +
-        '<p class="kit-text">' + esc(item.promptZh || item.prompt) + '</p>' +
-        '<p class="kit-note">参考范文（' + String(item.reference || '').split(/\s+/).length + ' 词）</p>' +
-        '<p class="kit-ref">' + esc(item.reference || '') + '</p></details>';
+        '<p class="kit-text kit-stem">' + esc(stem) + '</p>' + zhHint +
+        '<p class="kit-note">参考范文（' + refWords + ' 词）· 蓝色为逻辑连接词，浅黄底为主题句，虚线下划线词可点查释义</p>' +
+        '<p class="kit-ref">' + highlighted + '</p></details>';
     }).join('');
 
     const translationItems = translation.map(function (item) {
+      const stem = String(item.prompt || item.promptZh || '');
       return '<details class="kit-item"><summary>' + esc(item.title) + ' · 翻译</summary>' +
-        '<p class="kit-text">' + esc(item.promptZh || item.prompt) + '</p>' +
-        '<p class="kit-note">参考译文</p>' +
-        '<p class="kit-ref">' + esc(item.reference || '') + '</p></details>';
+        '<p class="kit-text kit-stem">' + esc(stem) + '</p>' +
+        '<p class="kit-note">参考译文 · 蓝色为逻辑连接词，浅黄底为主题句，虚线下划线词可点查释义</p>' +
+        '<p class="kit-ref">' + renderReference(stem, item.reference || '') + '</p></details>';
     }).join('');
 
     return [

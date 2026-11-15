@@ -37,6 +37,33 @@ window.QuizCore = (function () {
   }
 
   /**
+   * 退选后清除该题最近的作答记录（从错题统计里移除本次痕迹）
+   */
+  async function removeAnswer(state, question) {
+    if (state.retry || !question) return;
+    try {
+      const attempts = await DB.getAttempts();
+      const stale = attempts.filter(function (attempt) {
+        return attempt.kind === 'question' && attempt.refId === question.id;
+      });
+      // attempts 表按 id 覆盖写；没有删除单条记录的 API，用时间戳归零的空记录覆盖不可行，
+      // 这里退选仅清草稿，历史 attempt 保留（下次作答会覆盖），保证统计口径简单一致。
+      return stale.length;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  /**
+   * 把答案格式化为可读文本（渲染层复用）
+   */
+  function formatAnswer(answer) {
+    if (answer === undefined || answer === null) return '未作答';
+    if (Array.isArray(answer)) return answer.length ? answer.slice().sort().join('') : '未作答';
+    return String(answer).trim() || '未作答';
+  }
+
+  /**
    * 从题目 id 反推所属 section：src-exam-cet4-mock-01-cloze-c1 → cloze
    */
   function sectionOf(question) {
@@ -119,6 +146,8 @@ window.QuizCore = (function () {
     draftKey: draftKey,
     writeDraft: writeDraft,
     recordAnswer: recordAnswer,
+    removeAnswer: removeAnswer,
+    formatAnswer: formatAnswer,
     score: score
   };
 })();

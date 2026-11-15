@@ -1092,6 +1092,43 @@ input {
   gap: 8px;
 }
 
+/* 点选式候选词 chip */
+.wordbank-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  min-height: 36px;
+  transition: border-color 0.15s ease, opacity 0.15s ease, transform 0.12s ease;
+}
+
+.wordbank-chip:active {
+  transform: scale(0.97);
+}
+
+.wordbank-chip b {
+  color: var(--brand);
+  font-size: 12px;
+}
+
+.wordbank-chip.is-used {
+  opacity: 0.42;
+  background: #f0f3fa;
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+.wordbank-chip.is-current {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  box-shadow: 0 0 0 2px rgba(61, 107, 250, 0.18);
+}
+
 .wordbank-item {
   display: inline-flex;
   align-items: baseline;
@@ -1106,6 +1143,90 @@ input {
 .wordbank-item b {
   color: var(--brand);
   font-size: 12px;
+}
+
+/* 选词填空：已填词展示位（点击退选） */
+.blank-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  margin-top: 14px;
+  padding: 12px 16px;
+  border: 1.5px dashed #b9c8ef;
+  border-radius: var(--radius-m);
+  background: #f7f9fe;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.blank-slot.is-filled {
+  border-style: solid;
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+}
+
+.blank-slot-hint {
+  color: var(--ink-mute);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.blank-slot-empty {
+  color: var(--ink-mute);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* 练习模式即时判分反馈条 */
+.quiz-feedback {
+  display: none;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-s);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.quiz-feedback.is-ok {
+  background: #e9f9f3;
+  color: #0f8a6d;
+}
+
+.quiz-feedback.is-bad {
+  background: #fdeef0;
+  color: #c9394a;
+}
+
+/* 作答页右上角退出按钮 */
+.quiz-exit {
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.quiz-exit:active {
+  background: #f0f3fa;
+}
+
+/* 试卷卡片：题型构成行 */
+.paper-composition {
+  margin: -4px 0 10px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .material {
@@ -1415,6 +1536,98 @@ input {
   color: var(--ink-mute);
   font-size: 12px;
   line-height: 1.6;
+}
+
+/* ---------- 点词翻译浮层（word-tip.js） ---------- */
+.wt-word {
+  cursor: pointer;
+  border-bottom: 1px dotted #9db4e8;
+}
+
+.wt-hard {
+  border-bottom: 1px dotted var(--amber);
+}
+
+.wt-tip {
+  position: fixed;
+  z-index: 80;
+  display: none;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(27, 36, 48, 0.94);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.6;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.35);
+  pointer-events: auto;
+}
+
+.wt-tip.is-visible {
+  display: block;
+}
+
+.wt-tip-word {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.wt-tip-phon {
+  color: #b8c6e4;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.wt-tip-speak {
+  margin-left: auto;
+  padding: 3px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.wt-tip-mean {
+  margin-top: 6px;
+  color: #e6ecf7;
+  font-size: 12.5px;
+}
+
+/* ---------- 范文重点标注（me-stats.js） ---------- */
+.ref-link {
+  color: #2b6cb0;
+  font-weight: 600;
+}
+
+.ref-topic {
+  background: linear-gradient(transparent 55%, #fff1c2 55%);
+  font-weight: 600;
+  padding: 0 1px;
+}
+
+.kit-stem {
+  white-space: pre-wrap;
+}
+
+/* 写作卡内的中文提示折叠块 */
+.kit-zh {
+  margin: 6px 0 0;
+}
+
+.kit-zh summary {
+  padding: 6px 14px;
+  color: var(--brand-deep);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ref-br {
+  display: inline-block;
+  width: 8px;
 }
 
 @media (max-width: 420px) {

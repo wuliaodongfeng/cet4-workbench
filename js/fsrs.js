@@ -9,10 +9,11 @@ window.FSRS = (function () {
   const RETENTION_KEY = 'cet4wb:retention';
   const RETENTION_DEFAULT = 0.9;
   const RETENTION_OPTIONS = [0.85, 0.9];
-  // 首次评分给的初始稳定度（天），Again 也至少留 1 天，避免当天反复出现
-  const INITIAL_STABILITY = { 1: 0.8, 2: 1.6, 3: 2.8, 4: 4.5 };
-  // 复习时稳定度的增长倍数：Again 属于遗忘，直接折损
-  const GROWTH = { 1: 0.35, 2: 1.15, 3: 1.75, 4: 2.4 };
+  // 首次评分给的初始稳定度（天）：冲刺备考梯度 Again≈1 / Hard≈3 / Good≈7 / Easy≈15
+  // Again 不再是 0.8 天（当天重复），改为完整 1 天间隔，符合用户提出的复习时间梯度
+  const INITIAL_STABILITY = { 1: 1.0, 2: 3.0, 3: 7.0, 4: 15.0 };
+  // 复习时稳定度的增长倍数：Again 属于遗忘，直接折损；Good/Easy 保持约 1.7–2.0 倍的梯度增长
+  const GROWTH = { 1: 0.35, 2: 1.1, 3: 1.7, 4: 2.2 };
   const MAX_INTERVAL = 365;
 
   /**
@@ -181,6 +182,7 @@ window.FSRS = (function () {
 
   /**
    * 四个评分档对应的间隔预览（天），用于界面说明排期
+   * 冲刺梯度：Again=1 天，Hard≈3 天，Good≈7 天，Easy≈15 天（新卡首次评分）
    */
   function previewIntervals(word) {
     return [1, 2, 3, 4].map(function (rating) {

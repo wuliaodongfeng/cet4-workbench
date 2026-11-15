@@ -188,6 +188,9 @@ window.Quiz = (function () {
     else if (action === 'open-wrongbook') openWrongBook();
     else if (action === 'practice-wrongbook') practiceWrongBook();
     else if (action === 'option') chooseOption(target.dataset.letter);
+    else if (action === 'pick-word') pickWord(target.dataset.word);
+    else if (action === 'unpick-word') unpickWord(target.dataset.word);
+    else if (action === 'exit-quiz') exitQuiz();
     else if (action === 'next') next();
     else if (action === 'retry-wrong') retryWrong();
     else if (action === 'back-papers') loadPapers();
@@ -222,9 +225,62 @@ window.Quiz = (function () {
       state.answers[question.id] = letter;
     }
 
+    afterAnswer(question);
+  }
+
+  /**
+   * 选词填空：点击候选词填入当前空格
+   * 已被其他空格选用的词在渲染层已禁用；这里只处理当前题
+   */
+  function pickWord(word) {
+    const question = state.questions[state.index];
+    if (!question || !word) return;
+    state.answers[question.id] = String(word);
+    afterAnswer(question);
+  }
+
+  /** 选词填空：点击已填词的展示位退选，候选词回到面板 */
+  function unpickWord() {
+    const question = state.questions[state.index];
+    if (!question) return;
+    if (!state.answers[question.id]) return;
+    delete state.answers[question.id];
+    render();
+    QuizCore.writeDraft(state, false);
+    QuizCore.removeAnswer(state, question);
+  }
+
+  /** 选项/选词变更后的统一动作：练习模式即时判分反馈 + 落盘 */
+  function afterAnswer(question) {
     render();
     QuizCore.writeDraft(state, false);
     QuizCore.recordAnswer(state, question);
+    // 练习模式（非模考）：作答后立即显示本题正误，方便随时查看部分对错
+    if (state.mode === 'practice' && !state.retry) {
+      const correct = QuizCore.judge(question, state.answers[question.id]);
+      const feedback = document.getElementById('quiz-feedback');
+      if (feedback) {
+        feedback.textContent = correct ? '✓ 本题正确' : '✗ 本题答错 · 正确答案：' + QuizCore.formatAnswer(question.answer);
+        feedback.className = 'quiz-feedback ' + (correct ? 'is-ok' : 'is-bad');
+        feedback.style.display = 'block';
+      }
+    }
+  }
+
+  /** 随时退出：保存草稿并返回试卷列表；模考确认后按放弃处理 */
+  function exitQuiz() {
+    QuizExam.stop();
+    if (state.mode === 'exam') {
+      const answered = state.questions.filter(function (question) {
+        return !QuizCore.isEmpty(state.answers[question.id]);
+      }).length;
+      if (!window.confirm('模考尚未交卷，退出后本次成绩作废（已作答 ' + answered + ' 题的记录会保留）。确定退出吗？')) {
+        QuizExam.start(state, function () { submit(true); });
+        return;
+      }
+    }
+    QuizCore.writeDraft(state, false);
+    loadPapers();
   }
 
   /** 下一题：本题作答已即时落盘，这里只推进题序并保存快照 */

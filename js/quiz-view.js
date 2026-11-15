@@ -41,6 +41,25 @@ window.QuizView = (function () {
   }
 
   /**
+   * 读取试卷的题型构成（打开前可见）：从内置题库 papers.materials / wordbank 推导
+   */
+  function paperComposition(paperId) {
+    const paper = findPaper(paperId);
+    if (!paper) return '';
+    const parts = [];
+    if (Array.isArray(paper.wordbank) && paper.wordbank.length) parts.push('选词填空×10');
+    if (paper.materials && Array.isArray(paper.materials.matching) && paper.materials.matching.length) {
+      parts.push('长篇匹配×' + paper.materials.matching.length);
+    }
+    if (paper.materials && Array.isArray(paper.materials.reading) && paper.materials.reading.length) {
+      parts.push('仔细阅读×' + (paper.materials.reading.length * 4));
+    }
+    if (paper.writing) parts.push('写作×1');
+    if (paper.translation) parts.push('翻译×1');
+    return parts.length ? parts.join(' · ') : '';
+  }
+
+  /**
    * 渲染试卷列表：模式切换、错题本入口、专项练习、试卷进度
    */
   function renderPapers(state, el) {
@@ -53,12 +72,14 @@ window.QuizView = (function () {
       const enter = exam
         ? '开始模考（40 分钟）'
         : (paper.resumed ? '继续作答（第 ' + (paper.draftIndex + 1) + ' 题）' : (status === '进行中' ? '继续作答' : '进入作答'));
+      const composition = paperComposition(paper.paperId);
       return `
         <button class="paper-card" type="button" data-action="open-paper" data-paper="${esc(paper.paperId)}">
           <div class="paper-head">
             <span class="paper-name">${esc(paperLabel(paper.paperId))}</span>
             <span class="paper-meta">${esc(status)} · ${paper.total} 题</span>
           </div>
+          ${composition ? '<div class="paper-composition">' + esc(composition) + '</div>' : ''}
           <div class="paper-bar"><span style="width:${percent}%"></span></div>
           <div class="paper-foot">
             <span>已答 ${paper.answered} / ${paper.total}</span>
@@ -107,32 +128,51 @@ window.QuizView = (function () {
 
   /**
    * 选词填空的候选词库面板（A–O）
+   * 点选交互：已选词置灰标删除线并禁用，未选词可点；选中情况由 state.answers 推导
    */
-  function renderWordbank(question) {
+  function renderWordbank(state, question) {
     const paper = findPaper(question.paperId);
     const bank = paper && Array.isArray(paper.wordbank) ? paper.wordbank : [];
     if (QuizCore.sectionOf(question) !== 'cloze' || !bank.length) return '';
+    const used = {};
+    state.questions.forEach(function (item) {
+      const value = state.answers[item.id];
+      if (typeof value !== 'string' || !value.trim()) return;
+      const picked = String(value).trim().toLowerCase();
+      bank.forEach(function (word, index) {
+        if (String(word).toLowerCase() === picked) used[index] = true;
+      });
+    });
+    const current = state.answers[question.id] || '';
+    const items = bank.map(function (word, index) {
+      const letter = String.fromCharCode(65 + index);
+      const isUsed = !!used[index];
+      const isCurrent = String(current).trim().toLowerCase() === String(word).toLowerCase();
+      const cls = 'wordbank-chip' + (isUsed ? ' is-used' : '') + (isCurrent ? ' is-current' : '');
+      return '<button class="' + cls + '" type="button" data-action="pick-word" data-word="' + esc(word) + '"' +
+        (isUsed ? ' disabled' : '') + '><b>' + letter + '</b>' + esc(word) + '</button>';
+    }).join('');
     return '<div class="wordbank">' +
-      '<div class="wordbank-title">词库（选择一个填入空格，填原词即可）</div>' +
-      '<div class="wordbank-list">' + bank.map(function (word, index) {
-        return '<span class="wordbank-item"><b>' + String.fromCharCode(65 + index) + '</b>' + esc(word) + '</span>';
-      }).join('') + '</div></div>';
+      '<div class="wordbank-title">点击候选词填入本题空格 · 已选词会置灰，点击空格可退选</div>' +
+      '<div class="wordbank-list">' + items + '</div></div>';
   }
 
   /**
    * 阅读材料：matching 展示 A–F 段原文，reading 按题干 (Passage N) 取对应原文
+   * 英文原文接入点词翻译：点击单词弹出释义（word-tip.js）
    */
   function renderMaterial(question) {
     const paper = findPaper(question.paperId);
     const materials = paper && paper.materials ? paper.materials : null;
     if (!materials) return '';
     const section = QuizCore.sectionOf(question);
+    const enrich = window.WordTip && window.WordTip.enrich ? function (text) { return window.WordTip.enrich(text); } : esc;
 
     if (section === 'matching' && Array.isArray(materials.matching) && materials.matching.length) {
       const body = materials.matching.map(function (item) {
-        return '<p class="material-para"><b>' + esc(item.key) + '</b>' + esc(item.text) + '</p>';
+        return '<p class="material-para"><b>' + esc(item.key) + '</b>' + enrich(item.text) + '</p>';
       }).join('');
-      return materialBox('阅读原文（A–F 段）', body);
+      return materialBox('阅读原文（A–F 段）· 点击生词查释义', body);
     }
 
     if (section === 'reading' && Array.isArray(materials.reading) && materials.reading.length) {
@@ -142,8 +182,8 @@ window.QuizView = (function () {
         return String(item.key) === number;
       })[0];
       if (!passage) return '';
-      return materialBox('阅读原文 Passage ' + esc(number),
-        '<p class="material-para">' + esc(passage.text) + '</p>');
+      return materialBox('阅读原文 Passage ' + esc(number) + ' · 点击生词查释义',
+        '<p class="material-para">' + enrich(passage.text) + '</p>');
     }
     return '';
   }
@@ -157,7 +197,8 @@ window.QuizView = (function () {
   }
 
   /**
-   * 渲染选项区（含填空题输入框）
+   * 渲染选项区：cloze 有词库时用“已填词展示位”替代输入框（点击退选），
+   * 其余填空保留输入框
    */
   function renderOptions(state, question) {
     if (question.type === 'blank') {
@@ -165,7 +206,15 @@ window.QuizView = (function () {
       const paper = findPaper(question.paperId);
       const hasBank = QuizCore.sectionOf(question) === 'cloze' && paper &&
         Array.isArray(paper.wordbank) && paper.wordbank.length > 0;
-      const placeholder = hasBank ? '从上方词库中选择单词填写' : '请输入答案，多个答案任填其一';
+      if (hasBank) {
+        const filled = String(value).trim();
+        return '<button class="blank-slot' + (filled ? ' is-filled' : '') + '" type="button" ' +
+          'data-action="unpick-word" data-word="' + esc(filled) + '">' +
+          (filled ? esc(filled) + '<span class="blank-slot-hint">点此退选</span>'
+            : '<span class="blank-slot-empty">点击下方候选词填入</span>') +
+          '</button>';
+      }
+      const placeholder = '请输入答案，多个答案任填其一';
       return `<input class="blank-input" type="text" data-input="answer" autocomplete="off"
         placeholder="${placeholder}" value="${esc(value)}" />`;
     }
@@ -204,17 +253,19 @@ window.QuizView = (function () {
           ${timer}
           ${state.retry ? '<span class="quiz-retry-tag">错题重练</span>' : ''}
           <span class="quiz-type">${TYPE_LABEL[question.type] || '单选题'}</span>
+          <button class="quiz-exit" type="button" data-action="exit-quiz">退出</button>
         </span>
       </div>
       <p class="quiz-paper">${esc(paperLabel(state.paperId))}</p>
       <div class="quiz-stem">${esc(question.stem)}</div>
       ${renderMaterial(question)}
-      ${renderWordbank(question)}
+      ${renderWordbank(state, question)}
       ${renderOptions(state, question)}
+      <div class="quiz-feedback" id="quiz-feedback" style="display:none"></div>
       <div class="quiz-bottom">
         <button class="btn-primary" type="button" data-action="next">${isLast ? '交卷' : '下一题'}</button>
       </div>
-      <p class="quiz-hint">${question.type === 'multiple' ? '多选题：可选择多个选项' : '答完本题后点击按钮继续'}</p>`;
+      <p class="quiz-hint">${question.type === 'multiple' ? '多选题：可选择多个选项' : (state.mode === 'practice' ? '练习模式：作答后立即显示正误，可随时退出' : '答完本题后点击按钮继续')}</p>`;
   }
 
   /**
